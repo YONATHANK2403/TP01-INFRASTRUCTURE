@@ -1,0 +1,30 @@
+---
+- name: Vérifier que le routage IPv4 est actif
+  ansible.builtin.command: cat /proc/sys/net/ipv4/ip_forward
+  register: fw_ip_forward
+  changed_when: false
+  failed_when: fw_ip_forward.stdout | trim != '1'
+
+- name: Créer le répertoire de configuration nftables
+  ansible.builtin.file:
+    path: /etc/nftables.d
+    state: directory
+    mode: "0755"
+
+- name: Déployer le jeu de règles nftables (validé avec nft -c)
+  ansible.builtin.template:
+    src: "{{ configs_dir }}/nftables/router-fw.nft.j2"
+    dest: /etc/nftables.d/router-fw.nft
+    mode: "0644"
+    validate: nft -c -f %s
+  register: fw_conf
+
+- name: Lire l'état courant du pare-feu
+  ansible.builtin.command: nft list table inet tp01_filter
+  register: fw_state
+  changed_when: false
+  failed_when: false
+
+- name: Charger les règles (config modifiée ou règles absentes après redémarrage)
+  ansible.builtin.command: nft -f /etc/nftables.d/router-fw.nft
+  when: fw_conf.changed or fw_state.rc != 0

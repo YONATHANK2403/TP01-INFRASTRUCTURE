@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="fr">
+<head><meta charset="utf-8"><title>TP01 - web-dmz</title></head>
+<body>
+  <h1>TP01 - Serveur Web (DMZ)</h1>
+  <p>H&ocirc;te : {{ inventory_hostname }} &mdash; IP : {{ ip_web }} &mdash; Zone : DMZ ({{ net_dmz }})</p>
+  <p>Configur&eacute; automatiquement par Ansible (r&ocirc;le reverse-proxy).</p>
+  <ul>
+    <li><a href="/health">/health</a></li>
+    <li><a href="/api/">/api/</a> (reverse proxy vers le backend interne)</li>
+  </ul>
+</body>
+</html>

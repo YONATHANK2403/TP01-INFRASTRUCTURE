@@ -1,0 +1,17 @@
+# {{ ansible_managed }}
+port=53
+listen-address={{ ip_dns }}
+bind-interfaces
+no-resolv
+no-poll
+no-hosts
+domain-needed
+bogus-priv
+domain={{ lab_domain }}
+local=/{{ lab_domain }}/
+cache-size=150
+
+# Enregistrements de la zone {{ lab_domain }}
+{% for r in dns_records %}
+address=/{{ r.name }}.{{ lab_domain }}/{{ r.ip }}
+{% endfor %}

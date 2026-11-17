@@ -1,0 +1,99 @@
+# TP01 — Infrastructure réseau segmentée : DMZ / LAN / Management
+name: tp01
+
+x-node: &node
+  restart: unless-stopped
+  cap_add:
+    - NET_ADMIN            # pose de la route par défaut via router-fw (entrypoint.sh)
+  security_opt:
+    - no-new-privileges:true
+
+networks:
+  dmz:
+    name: tp01_dmz
+    internal: true         # pas de sortie Internet : tout le trafic inter-zones passe par router-fw
+    ipam:
+      config:
+        - subnet: 172.20.1.0/24
+          gateway: 172.20.1.254     # .1 est réservé à router-fw
+  lan:
+    name: tp01_lan
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.20.2.0/24
+          gateway: 172.20.2.254
+  mgmt:
+    name: tp01_mgmt
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.20.3.0/24
+          gateway: 172.20.3.254
+
+services:
+  router-fw:
+    <<: *node
+    build: { context: ., target: router }
+    image: tp01/router-fw:1.0
+    container_name: router-fw
+    hostname: router-fw
+    sysctls:
+      net.ipv4.ip_forward: "1"
+    networks:
+      dmz:  { ipv4_address: 172.20.1.1 }
+      lan:  { ipv4_address: 172.20.2.1 }
+      mgmt: { ipv4_address: 172.20.3.1 }
+
+  web-dmz:
+    <<: *node
+    build: { context: ., target: web }
+    image: tp01/web-dmz:1.0
+    container_name: web-dmz
+    hostname: web-dmz
+    environment:
+      DEFAULT_GW: 172.20.1.1
+      DNS_SERVER: 172.20.2.10
+      DNS_DOMAIN: tp01.lab
+    networks:
+      dmz: { ipv4_address: 172.20.1.10 }
+    depends_on: [router-fw]
+
+  dns-lan:
+    <<: *node
+    build: { context: ., target: dns }
+    image: tp01/dns-lan:1.0
+    container_name: dns-lan
+    hostname: dns-lan
+    environment:
+      DEFAULT_GW: 172.20.2.1
+    networks:
+      lan: { ipv4_address: 172.20.2.10 }
+    depends_on: [router-fw]
+
+  client-lan:
+    <<: *node
+    build: { context: ., target: client }
+    image: tp01/client:1.0
+    container_name: client-lan
+    hostname: client-lan
+    environment:
+      DEFAULT_GW: 172.20.2.1
+      DNS_SERVER: 172.20.2.10
+      DNS_DOMAIN: tp01.lab
+    networks:
+      lan: { ipv4_address: 172.20.2.20 }
+    depends_on: [router-fw]
+
+  admin-mgmt:
+    <<: *node
+    image: tp01/client:1.0
+    container_name: admin-mgmt
+    hostname: admin-mgmt
+    environment:
+      DEFAULT_GW: 172.20.3.1
+      DNS_SERVER: 172.20.2.10
+      DNS_DOMAIN: tp01.lab
+    networks:
+      mgmt: { ipv4_address: 172.20.3.10 }
+    depends_on: [router-fw, client-lan]

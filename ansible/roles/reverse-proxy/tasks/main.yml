@@ -1,0 +1,37 @@
+---
+- name: Créer les répertoires nginx
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - /var/log/nginx
+    - /usr/share/nginx/html
+
+- name: Déployer nginx.conf (reverse proxy, validé avec nginx -t)
+  ansible.builtin.template:
+    src: "{{ configs_dir }}/nginx/nginx.conf.j2"
+    dest: /etc/nginx/nginx.conf
+    mode: "0644"
+    validate: nginx -t -c %s
+  register: web_conf
+
+- name: Déployer la page d'accueil
+  ansible.builtin.template:
+    src: "{{ configs_dir }}/nginx/index.html.j2"
+    dest: /usr/share/nginx/html/index.html
+    mode: "0644"
+
+- name: Vérifier si nginx tourne
+  ansible.builtin.command: pgrep -x nginx
+  register: web_proc
+  changed_when: false
+  failed_when: false
+
+- name: Démarrer nginx
+  ansible.builtin.command: nginx
+  when: web_proc.rc != 0
+
+- name: Recharger nginx si la configuration a changé
+  ansible.builtin.command: nginx -s reload
+  when: web_conf.changed and web_proc.rc == 0

@@ -1,0 +1,15 @@
+---
+- name: Pare-feu nftables (router-fw)
+  hosts: routers
+  gather_facts: false
+  roles: [firewall]
+
+- name: Service DNS dnsmasq (dns-lan)
+  hosts: dns_servers
+  gather_facts: false
+  roles: [dns]
+
+- name: Serveur Web / reverse proxy Nginx (web-dmz)
+  hosts: web_servers
+  gather_facts: false
+  roles: [reverse-proxy]

@@ -1,0 +1,21 @@
+---
+- name: Déployer la configuration dnsmasq (validée avec dnsmasq --test)
+  ansible.builtin.template:
+    src: "{{ configs_dir }}/dnsmasq/dnsmasq.conf.j2"
+    dest: /etc/dnsmasq.conf
+    mode: "0644"
+    validate: dnsmasq --test --conf-file=%s
+  register: dns_conf
+
+- name: Vérifier si dnsmasq tourne
+  ansible.builtin.command: pgrep -x dnsmasq
+  register: dns_proc
+  changed_when: false
+  failed_when: false
+
+- name: (Re)démarrer dnsmasq si config modifiée ou processus absent
+  ansible.builtin.shell: |
+    pkill -x dnsmasq || true
+    sleep 1
+    dnsmasq --conf-file=/etc/dnsmasq.conf
+  when: dns_conf.changed or dns_proc.rc != 0

@@ -1,0 +1,39 @@
+#!/usr/sbin/nft -f
+# {{ ansible_managed }}
+# Politique : tout est refusé par défaut, seuls les flux listés sont autorisés.
+
+table inet tp01_filter
+delete table inet tp01_filter
+
+table inet tp01_filter {
+
+  chain input {
+    type filter hook input priority 0; policy drop;
+    iifname "lo" accept
+    ct state established,related accept
+    ct state invalid drop
+    ip protocol icmp accept comment "ping vers le routeur"
+  }
+
+  chain forward {
+    type filter hook forward priority 0; policy drop;
+
+    ct state established,related accept
+    ct state invalid counter drop
+
+    # LAN -> DMZ : HTTP vers le serveur Web uniquement (+ ping de la DMZ)
+    ip saddr {{ net_lan }} ip daddr {{ ip_web }} tcp dport 80 counter accept comment "LAN -> web-dmz HTTP"
+    ip saddr {{ net_lan }} ip daddr {{ net_dmz }} icmp type echo-request counter accept comment "LAN -> DMZ ping"
+
+    # DMZ -> LAN : DNS uniquement, vers dns-lan
+    ip saddr {{ ip_web }} ip daddr {{ ip_dns }} meta l4proto { tcp, udp } th dport 53 counter accept comment "web-dmz -> dns-lan DNS"
+
+    # MGMT -> DMZ et LAN : administration (ping, SSH, DNS, HTTP/HTTPS)
+    ip saddr {{ net_mgmt }} ip daddr { {{ net_dmz }}, {{ net_lan }} } icmp type echo-request counter accept comment "MGMT ping"
+    ip saddr {{ net_mgmt }} ip daddr { {{ net_dmz }}, {{ net_lan }} } tcp dport { 22, 53, 80, 443 } counter accept comment "MGMT tcp"
+    ip saddr {{ net_mgmt }} ip daddr {{ ip_dns }} udp dport 53 counter accept comment "MGMT dns"
+
+    # Tout le reste (DMZ->LAN, DMZ->MGMT, LAN->MGMT, ...) est bloqué et compté
+    counter drop comment "default deny"
+  }
+}
